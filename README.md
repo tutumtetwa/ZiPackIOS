@@ -1,6 +1,6 @@
 # 🍏 ZiPack: Your AI-Powered Personal Chef & Nutrition Companion (iOS App)
 
-![ZiPack App Icon](https://via.placeholder.com/150x150?text=ZiPack+App+Icon) 
+
 
 Welcome to **ZiPack**, a native iOS application built with Xcode, designed to be your intelligent personal chef and nutrition companion. This app helps you manage your diet, track your progress, and discover delicious, tailored recipes, leveraging the power of Firebase for robust data management and Google Gemini for personalized AI-driven culinary suggestions.
 
@@ -49,7 +49,7 @@ ZiPack aims to simplify healthy eating and tracking directly on your iPhone, off
 * **Platform:** iOS
 * **Development Environment:** Xcode
 * **Programming Language:** Swift / SwiftUI
-    * *(Based on the provided code snippets and the screenshot showing `ProfileView`, this project uses SwiftUI for UI development.)*
+  
 * **Backend & Services:**
     * **Firebase (Google Cloud Platform):**
         * **Firestore:** NoSQL database for storing user profiles, pantry items, meal logs, favorite recipes, and generated meal plans.
