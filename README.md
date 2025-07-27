@@ -56,10 +56,9 @@ ZiPack aims to simplify healthy eating and tracking directly on your iPhone, off
         * **Firebase Authentication:** For anonymous user authentication.
     * **Google Gemini API:** The core AI model for generating personalized recipes and meal plans.
     * **External Libraries/SDKs:**
-        * Firebase iOS SDK (for Auth, Firestore) - typically integrated via Swift Package Manager or CocoaPods.
-        * GoogleGenerativeAI (for Gemini API integration) - usually integrated via Swift Package Manager.
-        * Charts Library (e.g., `Charts` or `SwiftCharts` if a native charting library is used, as the provided React code's `Chart.js` is web-specific).
-            * *(**Self-correction:** Since the original provided code was React, if you've re-implemented charting natively in Xcode, you'll need a suitable iOS charting library. If you haven't, you might omit this or mention it as a future feature.)*
+        * Firebase iOS SDK (for Auth, Firestore) - integrated via Swift Package Manager.
+        * GoogleGenerativeAI (for Gemini API integration) - integrated via Swift Package Manager.
+        * Charts Library 
 
 ---
 
