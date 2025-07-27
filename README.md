@@ -1,4 +1,4 @@
-# 🍏 ZiPack: Your AI-Powered Personal Chef & Nutrition Companion (iOS App)
+# 🍏 ZiPack: Your Personal Chef & Nutrition Companion (iOS App)
 
 
 
