@@ -8,6 +8,7 @@
 
 import Foundation
 import FirebaseFirestore
+import FirebaseAI
 import Combine
 
 // Assuming NATIVE_APP_ID is defined globally or in FirebaseManager.swift
@@ -38,6 +39,21 @@ class RecipeGenerationViewModel: ObservableObject {
     private var db: Firestore { FirebaseManager.shared.db }
     private var userId: String? { FirebaseManager.shared.userId }
     private var cancellables = Set<AnyCancellable>()
+
+    // Gemini via Firebase AI Logic: requests go through the Firebase project, so no API key ships in the app.
+    private lazy var model: GenerativeModel = FirebaseAI.firebaseAI(backend: .googleAI()).generativeModel(
+        modelName: "gemini-2.5-flash",
+        generationConfig: GenerationConfig(temperature: 0.8, responseMIMEType: "application/json")
+    )
+
+    /// Sends a prompt to Gemini and returns the JSON response body.
+    private func generateJSON(_ prompt: String) async throws -> Data {
+        let response = try await model.generateContent(prompt + "\n\nReturn only the JSON object. All numeric fields must be whole integers.")
+        guard let text = response.text, let data = text.data(using: .utf8) else {
+            throw NSError(domain: "Zipack.Gemini", code: 1, userInfo: [NSLocalizedDescriptionKey: "Gemini returned an empty response."])
+        }
+        return data
+    }
 
     // Dependencies (View Models that provide data needed for recipe generation)
     @Published var profileViewModel: ProfileViewModel
@@ -84,7 +100,7 @@ class RecipeGenerationViewModel: ObservableObject {
             return
         }
         
-        // Simulate saving feedback to Firestore or local storage
+        // Save feedback to Firestore
         let feedbackData: [String: Any] = [
             "recipeId": recipe.id,
             "rating": recipeRating,
@@ -115,7 +131,7 @@ class RecipeGenerationViewModel: ObservableObject {
         }
     }
 
-    // Asynchronous function to generate a recipe using a simulated AI call
+    // Generates a personalised recipe with Gemini
     func generateRecipe(
         cuisinePreference: String,
         mealType: String,
@@ -197,43 +213,8 @@ class RecipeGenerationViewModel: ObservableObject {
             """
         }
 
-        // --- Simulate API call to Gemini ---
         do {
-            try await Task.sleep(nanoseconds: 2_000_000_000)
-
-            // Construct the recipe data using a dictionary for safety, then convert to JSON Data
-            // This is more robust against special characters breaking JSON string literal
-            let recipeData: [String: Any] = [
-                "recipeName": "\(spiceLevel.capitalized) \(cuisinePreference.isEmpty ? "Delicious" : cuisinePreference.capitalized) \(mealType.capitalized) Dish",
-                "description": "A simple, flavorful dish for \(servings) serving(s), prepared using the \(cookingMethod.capitalized) method. \(mealPrepFocus ? "Great for meal prep!" : "")",
-                "prepTimeMinutes": Int.random(in: 10...20),
-                "cookTimeMinutes": Int.random(in: 20...40),
-                "servings": servings,
-                "ingredients": [
-                    "\(Int.random(in: 150...250) * servings)g \((["chicken breast", "firm tofu", "lean ground beef", "canned chickpeas"].randomElement() ?? "protein source"))",
-                    "\(servings) cup \((["mixed vegetables", "bell pepper strips", "spinach", "zucchini slices"].randomElement() ?? "vegetables"))",
-                    "\(servings) tbsp \((["olive oil", "coconut oil", "avocado oil"].randomElement() ?? "cooking oil"))",
-                    "\(servings) tsp \((["garlic powder", "smoked paprika", "cumin", "Italian seasoning"].randomElement() ?? "seasoning blend"))",
-                    "\(servings) cup cooked \((["quinoa", "brown rice", "cauliflower rice", "whole wheat pasta"].randomElement() ?? "grain"))",
-                    "\(servings) pinch of salt and pepper"
-                ],
-                "instructions": [
-                    "Heat oil in pan. Add protein and cook.",
-                    "Add vegetables and seasoning, stir-fry until tender.",
-                    "Return protein to the pan. Sprinkle with \(servings) tsp seasoning blend, salt and pepper. Toss to combine.",
-                    "Serve immediately over \(servings) cup cooked grain. Enjoy your \(spiceLevel) dish!"
-                ],
-                "nutritionalInfo": [
-                    "calories": max(100, min(remainingCalories, 500 * servings)),
-                    "proteinGrams": max(5, min(profileViewModel.userProfile.proteinTarget, 30 * servings)),
-                    "carbsGrams": max(10, min(profileViewModel.userProfile.carbTarget, 50 * servings)),
-                    "fatGrams": max(5, min(profileViewModel.userProfile.fatTarget, 20 * servings))
-                ],
-                "notes": "This recipe is a simulation. In a real app, AI would generate dynamic content. Exclusions: \(excludedIngredients.isEmpty ? "None" : excludedIngredients). Inclusions: \(includedIngredients.isEmpty ? "None" : includedIngredients)."
-            ]
-            
-            // Convert dictionary to JSON Data
-            let jsonData = try JSONSerialization.data(withJSONObject: recipeData, options: .prettyPrinted)
+            let jsonData = try await generateJSON(prompt)
 
             let decoder = JSONDecoder()
             decoder.keyDecodingStrategy = .convertFromSnakeCase // Use this if your API response keys are snake_case
@@ -339,8 +320,8 @@ class RecipeGenerationViewModel: ObservableObject {
         let targetFat = profileViewModel.userProfile.fatTarget
         let dietaryRestrictions = profileViewModel.userProfile.dietaryRestrictions
 
-        // Simplified prompt for daily plan generation
-        var prompt = """
+        let today = { let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; return f.string(from: Date()) }()
+        let prompt = """
             You are an AI-powered meal planner. Generate a full daily meal plan in JSON format.
             The plan should include Breakfast, Lunch, Dinner, and 1-2 Snacks.
             The total nutritional values for the day should aim to meet the user's targets.
@@ -356,7 +337,7 @@ class RecipeGenerationViewModel: ObservableObject {
 
             IMPORTANT: The output MUST be a valid JSON object with the following structure.
             {
-              "date": "YYYY-MM-DD",
+              "date": "\(today)",
               "totalCalories": number,
               "totalProtein": number,
               "totalCarbs": number,
@@ -370,84 +351,12 @@ class RecipeGenerationViewModel: ObservableObject {
                   "carbs": number,
                   "fat": number
                 },
-                // ... more meals (Lunch, Dinner, Snacks)
               ]
             }
             """
         
         do {
-            try await Task.sleep(nanoseconds: 3_000_000_000)
-
-            let dateFormatter = DateFormatter()
-            dateFormatter.dateFormat = "yyyy-MM-dd"
-            let todayDateString = dateFormatter.string(from: Date())
-
-            // Ensure exact totals by calculating precise distributions
-            let breakfastCalories = Int(Double(targetCalories) * 0.25)
-            let lunchCalories = Int(Double(targetCalories) * 0.35)
-            let snackCalories = Int(Double(targetCalories) * 0.10)
-            let dinnerCalories = targetCalories - (breakfastCalories + lunchCalories + snackCalories)
-            
-            let breakfastProtein = Int(Double(targetProtein) * 0.25)
-            let lunchProtein = Int(Double(targetProtein) * 0.35)
-            let snackProtein = Int(Double(targetProtein) * 0.10)
-            let dinnerProtein = targetProtein - (breakfastProtein + lunchProtein + snackProtein)
-            
-            let breakfastCarbs = Int(Double(targetCarbs) * 0.30)
-            let lunchCarbs = Int(Double(targetCarbs) * 0.35)
-            let snackCarbs = Int(Double(targetCarbs) * 0.10)
-            let dinnerCarbs = targetCarbs - (breakfastCarbs + lunchCarbs + snackCarbs)
-            
-            let breakfastFat = Int(Double(targetFat) * 0.20)
-            let lunchFat = Int(Double(targetFat) * 0.40)
-            let snackFat = Int(Double(targetFat) * 0.15)
-            let dinnerFat = targetFat - (breakfastFat + lunchFat + snackFat)
-
-            // Construct the meal plan data using a dictionary for safety, then convert to JSON Data
-            let mealPlanData: [String: Any] = [
-                "date": todayDateString,
-                "totalCalories": targetCalories,
-                "totalProtein": targetProtein,
-                "totalCarbs": targetCarbs,
-                "totalFat": targetFat,
-                "meals": [
-                    [
-                        "mealType": "Breakfast",
-                        "recipeName": "Overnight Oats with Berries",
-                        "calories": breakfastCalories,
-                        "protein": breakfastProtein,
-                        "carbs": breakfastCarbs,
-                        "fat": breakfastFat
-                    ],
-                    [
-                        "mealType": "Lunch",
-                        "recipeName": "Grilled Chicken Salad with Vinaigrette",
-                        "calories": lunchCalories,
-                        "protein": lunchProtein,
-                        "carbs": lunchCarbs,
-                        "fat": lunchFat
-                    ],
-                    [
-                        "mealType": "Snack",
-                        "recipeName": "Apple Slices with Almond Butter",
-                        "calories": snackCalories,
-                        "protein": snackProtein,
-                        "carbs": snackCarbs,
-                        "fat": snackFat
-                    ],
-                    [
-                        "mealType": "Dinner",
-                        "recipeName": "Baked Salmon with Roasted Asparagus",
-                        "calories": dinnerCalories,
-                        "protein": dinnerProtein,
-                        "carbs": dinnerCarbs,
-                        "fat": dinnerFat
-                    ]
-                ]
-            ]
-            
-            // Convert dictionary to JSON Data
-            let jsonData = try JSONSerialization.data(withJSONObject: mealPlanData, options: .prettyPrinted)
+            let jsonData = try await generateJSON(prompt)
 
             let decoder = JSONDecoder()
             decoder.keyDecodingStrategy = .convertFromSnakeCase

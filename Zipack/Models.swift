@@ -8,7 +8,6 @@
 
 import Foundation // For Codable, UUID
 import FirebaseFirestore // For Timestamp, DocumentID
-import FirebaseFirestoreSwift // For @DocumentID
 
 // MARK: - String Extension for JSON Escaping
 // This extension helps ensure that strings interpolated into JSON are properly escaped.
@@ -155,7 +154,8 @@ struct GeneratedRecipe: Codable, Identifiable, Equatable { // Added Equatable
         // This will create a new ID every time, which might not be desired if you want a stable ID for the same "simulated" recipe.
         // A more stable approach might be to hash recipeName + description for a consistent ID for generated recipes.
         // For now, UUID is fine for distinctness.
-        self.id = UUID().uuidString
+        // Keep the stored id when reading a saved favourite; new AI recipes get a fresh one
+        self.id = try container.decodeIfPresent(String.self, forKey: .id) ?? UUID().uuidString
     }
     
     // For Equatable conformance

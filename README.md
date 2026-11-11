@@ -54,10 +54,9 @@ ZiPack aims to simplify healthy eating and tracking directly on your iPhone, off
     * **Firebase (Google Cloud Platform):**
         * **Firestore:** NoSQL database for storing user profiles, pantry items, meal logs, favorite recipes, and generated meal plans.
         * **Firebase Authentication:** For anonymous user authentication.
-    * **Google Gemini API:** The core AI model for generating personalized recipes and meal plans.
+    * **Gemini 2.5 Flash via Firebase AI Logic:** generates personalized recipes and daily meal plans as structured JSON. Requests go through the Firebase project, so no API key is embedded in the app.
     * **External Libraries/SDKs:**
-        * Firebase iOS SDK (for Auth, Firestore) - integrated via Swift Package Manager.
-        * GoogleGenerativeAI (for Gemini API integration) - integrated via Swift Package Manager.
+        * Firebase iOS SDK 12 (Auth, Firestore, FirebaseAI) via Swift Package Manager.
         * Charts Library 
 
 ---
@@ -77,5 +76,11 @@ To run the ZiPack iOS app on your machine, follow these steps:
 Open your Terminal application and execute the following commands:
 
 ```bash
-git clone [https://github.com/tutumtetwa/ZipackIOS.git](https://github.com/tutumtetwa/ZipackIOS.git)
-cd Zipack
+git clone https://github.com/tutumtetwa/ZiPackIOS.git
+cd ZiPackIOS
+open Zipack.xcodeproj
+
+### 3. Enable Gemini (one time, per Firebase project)
+In the Firebase console, open **AI Logic → Get started** and choose the **Gemini Developer API**. Recipe and meal-plan generation return an error until this is turned on.
+
+**Live web companion:** https://zipack-42721.web.app
